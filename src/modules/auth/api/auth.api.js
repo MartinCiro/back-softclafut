@@ -2,6 +2,7 @@ const { loginUser, verifyJWT } = require("../controller/login.controller");
 const ResponseBody = require('../../../shared/model/ResponseBody.model');
 const { createUser, listarUsuarios, modificarUsuario, listarPermisos, listarPermisoXUsuario, listarRoles } = require("../controller/manager.controller");
 const { decodePassword } = require("../utils/decodePass.utils");
+const config = require('../../../config.js');
 
 /**
  * Callback para el endpoint `/auth/login`
@@ -9,22 +10,10 @@ const { decodePassword } = require("../utils/decodePass.utils");
  * @param { Express.Response } res 
  */
 const loginAPI = async (req, res) => {
-    const { username, enpass: encodedPassword } = req.body;
-    let message, loginResponse, password;
+    const { username, enpass: password } = req.body;
+    let message, loginResponse;
 
-    if (!username) {
-        return res.status(400).json(new ResponseBody(false, 400, { message: 'No se ha proporcionado un nombre de usuario' }));
-    } else if (!encodedPassword) {
-        return res.status(400).json(new ResponseBody(false, 400, { message: 'No se ha proporcionado una contraseña' }));
-    }
-
-    try {
-        password = decodePassword(encodedPassword);
-    } catch (error) {
-        console.log('Ha ocurrido un error decodificando contraseña: ', error);
-        return res.status(500).json(new ResponseBody(false, 500, { message: 'Ha ocurrido un error con el formato de la contraseña' }));
-    }
-
+    
     try {
         loginResponse = await loginUser({ user: username, pass: password });
         message = new ResponseBody(loginResponse.ok, loginResponse.status_cod, loginResponse.data);
@@ -100,7 +89,7 @@ const createUserAPI = async (req, res) => {
  *      }
  */
 const isAuthenticatedMW = async (req, res, next) => {
-    const jwtRegex = /^[A-Za-z0-9_-]{2,}(?:\.[A-Za-z0-9_-]{2,}){2}$/;
+    const jwtRegex = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/;
 
     const token = req.get("jwt") || req.get("Authorization");
 
@@ -122,7 +111,9 @@ const isAuthenticatedMW = async (req, res, next) => {
 
     // Verificar el JWT y obtener una respuesta para asignar a la variable req
     try {
+        
         verifyResponse = await verifyJWT(token);
+        
     } catch (error) {
         console.log(error)
         if (error.message) {
@@ -163,14 +154,25 @@ const checkPermissions = (roles) => {
         }
     }
 
+    // En entorno de desarrollo, aseguramos que `id_rol` esté presente para evitar errores
+    
+
+
     /**
     * @param {*} req 
     * @param {*} res 
     * @param {*} next 
     */
+    
     return (req, res, next) => {
         const { id_rol } = req.userData;
+        if (!id_rol && config.env === 'Dev') {
+            console.warn('No se encontró `id_rol` en el entorno de desarrollo. Permitiendo el acceso.');
+            next();
+            return;
+        }
 
+        
         if (!id_rol || !roles.includes(id_rol)) {
             return res.status(403).json(new ResponseBody(
                 false,

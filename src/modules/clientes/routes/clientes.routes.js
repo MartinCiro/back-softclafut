@@ -21,9 +21,6 @@ const router = Router();
  *      }
  *  }
  */
-router.get('/clientes/getClientePage', isAuthenticatedMW, checkPermissions([1, 2]), getClientePageAPI)
+router.get('/clientes', isAuthenticatedMW, checkPermissions([1, 2]), listarFechasAPI)
 
-router.get('/clientes', (req, res) => {
-    return res.send({ 'status': 'on' });
-})
 module.exports = router;

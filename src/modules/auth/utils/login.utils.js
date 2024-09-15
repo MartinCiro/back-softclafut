@@ -18,16 +18,15 @@ async function retrieveUser(usuario) {
     const pool = await getConnection();
     const params = [];
     let queryWHERE;
-
     if (usuario.user) {
         params.push(usuario.user);
-        queryWHERE = 'WHERE ((LOWER(u.correo) = LOWER($1)) OR (LOWER(u.usuario) = LOWER($1)))';
+        // Usamos el campo 'username' en lugar de 'correo'
+        queryWHERE = 'WHERE LOWER(u.username) = LOWER($1)';
     } else if (usuario.id_user) {
         params.push(usuario.id_user);
+        // Usamos el campo 'id' para buscar por ID
         queryWHERE = 'WHERE u.id = $1';
-    }
-
-    if (!queryWHERE) {
+    } else {
         throw {
             ok: false,
             status_cod: 400,
@@ -38,20 +37,20 @@ async function retrieveUser(usuario) {
     return pool
         .query(`
         SELECT 
-            u.id AS id_user, u.correo, 
-            u.usuario, u.contrasena,
-            u.nombre, u.apellidos,
-            u.id_rol, r.nombre as rol,
-            u.habilitado, u.id_sede, u.numero_contacto 
-        FROM usuario u
-        LEFT JOIN rol r ON r.id = u.id_rol
+            u.id AS id_user, 
+            u.username AS usuario, 
+            u.pass AS contrasena, 
+            u.nombre, 
+            u.apellido AS apellidos,
+            u.id_rol AS id_rol
+        FROM users u
         ${queryWHERE}
         `, params)
         .then(data => {
             if (data.rowCount > 0) {
                 return data.rows[0];
             }
-            return;
+            return null; // Cambiar a `null` si no se encuentra el usuario
         })
         .catch(error => {
             console.log(error);
@@ -60,8 +59,9 @@ async function retrieveUser(usuario) {
                 status_cod: 400,
                 data: 'Ocurrió un error consultando usuario',
             };
-        }).finally(() => pool.end);
+        }).finally(() => pool.end());
 }
+
 
 module.exports = {
     retrieveUser

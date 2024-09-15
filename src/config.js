@@ -6,6 +6,7 @@ module.exports = {
     // Server Config
     port: process.env.PORT || 3000,
     env: process.env.env || 'Dev',
+    //env: process.env.env || 'prod',
 
     // DBConn
     UserDB: process.env.UserDB,
