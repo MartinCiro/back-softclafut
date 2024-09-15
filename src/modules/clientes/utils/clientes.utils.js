@@ -685,7 +685,7 @@ async function getFechas(element) {
   if (element === undefined) {
     return pool
       .query(
-        "SELECT rol.id AS rol_id, rol.nombre AS rol_nombre, rol.descripcion AS rol_descripcion, rol.estado AS rol_estado, STRING_AGG(DISTINCT permiso.nombre, ', ') AS permisos_nombres, STRING_AGG(DISTINCT permiso.descripcion, ', ') AS permisos_descripciones FROM rol INNER JOIN rolxpermiso ON rol.id = rolxpermiso.id_rol INNER JOIN permiso ON rolxpermiso.id_permiso = permiso.id_permiso GROUP BY rol.id, rol.nombre, rol.descripcion, rol.estado ORDER BY rol.id")
+        " TU CONSULTA SQL GET")
       .then((data) => {
         return data.rowCount > 0 ? data.rows : null;
       })
