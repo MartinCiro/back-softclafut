@@ -1,4 +1,8 @@
-import app from './app';
+const app = require("./app.js");
 
-app.listen(app.get('port'))
-console.log('server on port',app.get('port'));
+const port = app.get("port") || 8000;
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+  
