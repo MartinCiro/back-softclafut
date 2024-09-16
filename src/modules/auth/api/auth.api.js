@@ -1,7 +1,7 @@
 const { loginUser, verifyJWT } = require("../controller/login.controller");
 const ResponseBody = require('../../../shared/model/ResponseBody.model');
 const { createUser, listarUsuarios, modificarUsuario, listarPermisos, listarPermisoXUsuario, listarRoles } = require("../controller/manager.controller");
-const { decodePassword } = require("../utils/decodePass.utils");
+const { Usuario } = require("../../auth/model/usuario");
 const config = require('../../../config.js');
 
 /**
@@ -13,7 +13,6 @@ const loginAPI = async (req, res) => {
     const { username, enpass: password } = req.body;
     let message, loginResponse;
 
-    
     try {
         loginResponse = await loginUser({ user: username, pass: password });
         message = new ResponseBody(loginResponse.ok, loginResponse.status_cod, loginResponse.data);
@@ -41,28 +40,13 @@ const loginAPI = async (req, res) => {
  * @param { Express.Response } res 
  */
 const createUserAPI = async (req, res) => {
-
-    const {
-        usuario,
-        encpass,
-        id_rol,
-        habilitado } = req.body;
-
-    let message, createUserResponse, password;
-
-    if (!usuario || !encpass || !id_rol || !habilitado) {
-        return res.status(400).json(new ResponseBody(false, 400, 'No se han proporcionado datos suficientes para crear un nuevo usuario'));
-    }
+    const { user, pass, id_rol, status, nombres, apellidos } = req.body;
+    
+    let message, createUserResponse;
 
     try {
-        password = decodePassword(encpass);
-    } catch (error) {
-        console.log('Ha ocurrido un error decodificando contraseña: ', error);
-        return res.status(500).json(new ResponseBody(false, 500, 'Ha ocurrido un error con el formato de la contraseña'));
-    }
-
-    try {
-        createUserResponse = await createUser({ usuario, pass: password, habilitado, id_rol });
+        // Crear el usuario con la contraseña encriptada
+        createUserResponse = await createUser({ user, pass, status, id_rol, nombres, apellidos });
         message = new ResponseBody(createUserResponse.ok, createUserResponse.status_cod, createUserResponse.data);
     } catch (error) {
         if (error.status_cod) {
@@ -75,6 +59,7 @@ const createUserAPI = async (req, res) => {
 
     return res.json(message);
 }
+
 
 /**
  * Callback para el middleware de verificación de JWT
@@ -154,10 +139,6 @@ const checkPermissions = (roles) => {
         }
     }
 
-    // En entorno de desarrollo, aseguramos que `id_rol` esté presente para evitar errores
-    
-
-
     /**
     * @param {*} req 
     * @param {*} res 
@@ -218,27 +199,10 @@ const listarUsuariosAPI = async (req, res) => {
  * @returns 
  */
 const actualizarUsuarioAPI = async (req, res) => {
-    const { correo, id_sede, id_rol, numero_contacto, habilitado, id_cargo, nombre, apellidos } = req.body;
-    const { id } = req.query;
-
-    if (!id) {
-        return res.json({
-            ok: false,
-            status_cod: 400,
-            data: 'No se ha proporcionado el identificador del usuario',
-        });
-    }
-
-    if (!numero_contacto && !correo && !id_rol && !habilitado && !id_sede && !id_cargo && !nombre && !apellidos) {
-        return res.json({
-            ok: false,
-            status_cod: 400,
-            data: 'No se ha proporcionado campos válidos para actualizar',
-        });
-    }
+    const { id, id_rol, estado, nombres, username, apellidos } = req.body;
 
     try {
-        const updateUsuarioResponse = await modificarUsuario({ id, correo, id_sede, id_rol, numero_contacto, habilitado, id_cargo, nombre, apellidos });
+        const updateUsuarioResponse = await modificarUsuario({ id, id_rol, estado, nombres, username, apellidos });
         message = new ResponseBody(true, 200, updateUsuarioResponse);
     } catch (error) {
         if (error.status_cod) {

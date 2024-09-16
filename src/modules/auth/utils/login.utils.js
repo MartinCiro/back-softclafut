@@ -20,7 +20,6 @@ async function retrieveUser(usuario) {
     let queryWHERE;
     if (usuario.user) {
         params.push(usuario.user);
-        // Usamos el campo 'username' en lugar de 'correo'
         queryWHERE = 'WHERE LOWER(u.username) = LOWER($1)';
     } else if (usuario.id_user) {
         params.push(usuario.id_user);
@@ -33,27 +32,22 @@ async function retrieveUser(usuario) {
             data: 'No se ha proporcionado un identificador para el usuario',
         };
     }
-
     return pool
         .query(`
         SELECT 
             u.id AS id_user, 
             u.username AS usuario, 
             u.pass AS contrasena, 
-            u.nombre, 
-            u.apellido AS apellidos,
+            u.nombres, 
+            u.apellidos,
             u.id_rol AS id_rol
         FROM users u
         ${queryWHERE}
         `, params)
         .then(data => {
-            if (data.rowCount > 0) {
-                return data.rows[0];
-            }
-            return null; // Cambiar a `null` si no se encuentra el usuario
+            return data.rowCount > 0 ? data.rows[0] : null;
         })
         .catch(error => {
-            console.log(error);
             throw {
                 ok: false,
                 status_cod: 400,

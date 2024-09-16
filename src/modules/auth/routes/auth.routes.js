@@ -13,7 +13,7 @@ router.post('/auth/login', loginAPI);
 
 
 router.post('/auth/create/user', createUserAPI);
-router.patch('/auth/update/user', isAuthenticatedMW, checkPermissions([2]), actualizarUsuarioAPI);
+router.patch('/auth/update/user', isAuthenticatedMW, checkPermissions([1]), actualizarUsuarioAPI);
 
 
 router.get('/usuario/listarUsuario', isAuthenticatedMW, checkPermissions([2]), listarUsuariosAPI);
@@ -37,7 +37,6 @@ if (env == 'Dev') router.post('/auth/testDecode', (req, res) => {
     return res.json(message);
 });
 
-
 if (env == 'Dev') router.post('/auth/testEncode', (req, res) => {
     const { pass } = req.body;
     let message;
@@ -51,6 +50,5 @@ if (env == 'Dev') router.post('/auth/testEncode', (req, res) => {
 
     return res.json(message);
 });
-
 
 module.exports = router;

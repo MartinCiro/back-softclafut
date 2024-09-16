@@ -2,6 +2,7 @@ const config = require('../../../config.js');
 const Usuario = require('../model/usuario.js');
 const { retrieveUser } = require('../utils/login.utils.js');
 const jwt = require('jsonwebtoken');
+const { validator } = require('../utils/manager.utils.js');
 
 /**
  * 
@@ -10,8 +11,9 @@ const jwt = require('jsonwebtoken');
 async function loginUser(usuario) {
     let usuarioRetrieved;
     const INVALIDMESSAGE = 'Usuario o contraseña inválida';
+    validator(usuario.user, "el usuario");
+    validator(usuario.pass, "la contraseña");
     const usuarioLogin = Usuario(usuario.user, usuario.pass);
-
     // Retrieve user
     usuarioRetrieved = await retrieveUser(usuarioLogin);
 
@@ -21,23 +23,20 @@ async function loginUser(usuario) {
 
     // Create JWT
     const token = jwt.sign(
-        { id_user: usuarioRetrieved.id_user, username: usuarioRetrieved.usuario, rol: usuarioRetrieved.rol },
+        { id_user: usuarioRetrieved.id_user, username: usuarioRetrieved.usuario, id_rol: usuarioRetrieved.id_rol },
         config.JWT_SECRETO,
         { expiresIn: config.JWT_TIEMPO_EXPIRA }
     );
-
     return {
         ok: true,
         status_cod: 200,
         data: {
             token,
             usuario: {
-                correo: usuarioRetrieved.correo,
-                nombre: usuarioRetrieved.nombre,
-                apellidos: usuarioRetrieved.apellidos,
-                rol: usuarioRetrieved.rol,
                 usuario: usuarioRetrieved.usuario,
-                numeroContacto: usuarioRetrieved.numero_contacto,
+                nombre: usuarioRetrieved.nombres,
+                apellidos: usuarioRetrieved.apellidos,
+                rol: usuarioRetrieved.id_rol
             }
         }
     };
@@ -68,16 +67,16 @@ async function verifyJWT(token) {
     }
 
     // Verificar que el JWT decodificado contenga id_user
-    if (!decodificada?.id_user) {
-        throw { message: 'El JWT es incorrecto' };
+    if (!decodificada.id_user) {        
+        throw { message: 'El JWT es incorrecto'};
     }
 
 
     // Verificar integridad del token
     try {
         // Verificar el token usando la clave secreta
-        const verified = jwt.verify(jwt, config.JWT_SECRETO);
-
+        const verified = jwt.verify(token, config.JWT_SECRETO);
+        
         // Cálculo del tiempo restante hasta la expiración
         const expireDate = new Date(verified.exp * 1000);
         const now = new Date();
@@ -88,16 +87,17 @@ async function verifyJWT(token) {
         if (diffMins < 10) {
             // Crear un nuevo token sin el campo `exp` en el payload
             response.jwt = jwt.sign(
-                { id_user: verified.id_user, username: verified.username }, // Asegúrate de usar los datos correctos
+                { id_user: verified.id_user, username: verified.username, id_rol: verified.id_rol }, // Asegúrate de usar los datos correctos
                 config.JWT_SECRETO,
                 { expiresIn: config.JWT_TIEMPO_EXPIRA }
             );
         }
-
+        
         response.userInfo = verified;
         return response;
 
     } catch (error) {
+        console.log(error);
         if (error.name === 'TokenExpiredError') {
             throw { message: 'JWT expirado. Por favor inicie sesión nuevamente' };
         } else {

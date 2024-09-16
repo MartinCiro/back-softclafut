@@ -1,5 +1,29 @@
 const { getConnection } = require('../../../interface/DBConn.js');
 
+const validator = (valor, nombre) => {
+    if (!valor)
+        throw {
+        ok: false,
+        status_cod: 400,
+        data: `No se ha proporcionado ${nombre}`,
+    };
+};
+  
+const existe = (error, datos) => {
+    const errorMessages = {
+        duplicateEntry: (field) => `No se ha podido insertar el registro. El ${field} ya existe`,
+    };
+
+    if (error.code === "23505") {
+        const field = datos;
+        throw {
+        ok: false,
+        status_cod: 409,
+        data: errorMessages.duplicateEntry(field),
+        };
+    }
+};
+
 /**
  * @param {{ 
  *              getEncryptedPassword: () => string, 
@@ -15,32 +39,26 @@ async function insertNewUser(usuario) {
     /** @type {string[]} a */
     const params = [];
     const pool = await getConnection();
-
+    
     // Configuración de la request
     params.push(usuario.getEncryptedPassword());
     params.push(usuario.id_rol);
-    params.push(usuario.usuario);
-    params.push(usuario.habilitado);
+    params.push(usuario.user);
+    params.push(usuario.status);
+    params.push(usuario.nombres);
+    params.push(usuario.apellidos);
 
     return pool.query(`
-        INSERT INTO usuario
-        (usuario, contrasena, id_rol, habilitado)
-        VALUES ($3, $1, $2, $4)
+        INSERT INTO users
+        (pass, id_rol, username, estado, nombres, apellidos)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id;
         `, params)
         .then(data => {
             return data.rows[0].id;
         })
         .catch(error => {
-            if (error.code && error.code == '23505') {
-                let regexp = /(Key [(])(.*)[)]=/;
-                let table = regexp.exec(error.detail)[2];
-                throw {
-                    ok: false,
-                    status_cod: 409,
-                    data: `No se ha podido crear el usuario: ${table} duplicado`
-                }
-            }
+            existe(error, 'username');
             console.log(error);
             throw {
                 ok: false,
@@ -48,16 +66,6 @@ async function insertNewUser(usuario) {
                 data: 'Ocurrió un error insertando nuevo usuario'
             };
         }).finally(() => pool.end);
-}
-
-
-/**
- * 
- * @param {*} base64image 
- * @returns {Promise<{value: string | number}>}
- */
-async function createProfilePic(base64image) {
-    return;
 }
 
 /**
@@ -148,94 +156,65 @@ async function fetchUsuarios() {
  *  }} options 
  */
 async function updateUsuario(options) {
-    const { id, correo, id_sede, id_rol, numero_contacto, habilitado, id_cargo, nombre, apellidos } = options;
-    let query, params = [];
-
-    if (!id) throw {
-        ok: false,
-        status_cod: 400,
-        data: 'No se puede ejecutar esta acción, debe ingresar el identificador del cliente',
-    }
-
-    params.push(id);
-
-    if (correo) {
-        params.push(correo);
-        query = query ? `${query}, correo = $${params.length}` : `correo = $${params.length}`;
-    }
-
-    if (numero_contacto) {
-        params.push(numero_contacto);
-        query = query ? `${query}, numero_contacto = $${params.length}` : `numero_contacto = $${params.length}`;
-    }
-
-    if (habilitado) {
-        params.push(habilitado);
-        query = query ? `${query}, habilitado = $${params.length}` : `habilitado = $${params.length}`;
-    }
-
-    if (id_sede) {
-        params.push(id_sede);
-        query = query ? `${query}, id_sede = $${params.length}` : `id_sede = $${params.length}`;
-    }
-
-    if (id_rol) {
-        params.push(id_rol);
-        query = query ? `${query}, id_rol = $${params.length}` : `id_rol = $${params.length}`;
-    }
-
-    if (id_cargo) {
-        params.push(id_cargo);
-        query = query ? `${query}, id_cargo = $${params.length}` : `id_cargo = $${params.length}`;
-    }
-    if (nombre) {
-        params.push(nombre);
-        query = query ? `${query}, nombre = $${params.length}` : `nombre = $${params.length}`;
-    }
-    if (apellidos) {
-        params.push(apellidos);
-        query = query ? `${query}, apellidos = $${params.length}` : `apellidos = $${params.length}`;
-    }
-
-    if (!query) {
+    const { id, ...fields } = options; // Extrae el ID y el resto de los campos
+    if (!id) {
         throw {
             ok: false,
             status_cod: 400,
-            data: 'No se han proporcionado campos suficientes'
-        }
+            data: 'El ID del usuario es requerido'
+        };
     }
 
-    console.log(`
-        UPDATE usuario SET
-        ${query}
+    const params = [id];
+    const setClauses = [];
+
+    // Construye dinámicamente la lista de campos a actualizar
+    Object.keys(fields).forEach((field, index) => {
+        if (fields[field] !== undefined && fields[field] !== null) {
+            params.push(fields[field]);
+            setClauses.push(`${field} = $${params.length}`);
+        }
+    });
+
+    if (setClauses.length === 0) {
+        throw {
+            ok: false,
+            status_cod: 400,
+            data: 'No se han proporcionado campos para actualizar'
+        };
+    }
+
+    // Construye la consulta SQL
+    const query = `
+        UPDATE users
+        SET ${setClauses.join(', ')}
         WHERE id = $1;
-    `);
-
-    console.log(params);
-
+    `;
     const pool = await getConnection();
 
-    return pool.query(`
-        UPDATE usuario SET
-        ${query}
-        WHERE id = $1;
-    `, params
-    ).then(data => {
-        if (data.rowCount == 0) throw {
-            ok: false,
-            status_cod: 500,
-            data: 'No se pudo actualizar el usuario',
+    try {
+        const result = await pool.query(query, params);
+        console.log(result);
+        if (result.rowCount === 0) {
+            throw {
+                ok: false,
+                status_cod: 500,
+                data: 'No se pudo actualizar el usuario'
+            };
         }
-    }).catch((err) => {
+    } catch (err) {
         if (err.status_cod) throw err;
         console.error('Ocurrió un error actualizando usuario en la base de datos', err);
         throw {
             ok: false,
             status_cod: 500,
-            data: `Ocurrió un error en base de datos actualizando el usuario`,
-        }
-    }).finally(() => pool.end());
-};
+            data: 'Ocurrió un error en la base de datos actualizando el usuario'
+        };
+    } finally {
+        pool.end(); // Asegúrate de cerrar la conexión
+    }
+}
+
 
 async function fetchPermisos() {
     const pool = await getConnection();
@@ -278,14 +257,36 @@ async function usuarioXpermisos(id_rol, id_usuario) {
     const pool = await getConnection();
 
     return pool.query(` 
-        SELECT  p.nombre  AS permisos
-        FROM rolxpermiso r 
-        INNER JOIN permiso p ON p.id = r.id_permiso 
-        INNER JOIN rol r2 ON r2.id  = r.id_rol 
-        INNER JOIN usuario u  ON u.id_rol  = r.id_rol 
-        WHERE r2.id = $1 AND u.id = $2
+        SELECT
+            rol.id AS rol_id,
+            rol.nombre AS rol_nombre,
+            rol.descripcion AS rol_descripcion,
+            rol.estado AS rol_estado,
+            STRING_AGG(DISTINCT permiso.nombre, ', ') AS permisos_nombres,
+            STRING_AGG(DISTINCT permiso.descripcion, ', ') AS permisos_descripciones
+        FROM
+            rol
+        INNER JOIN
+            rolxpermiso ON rol.id = rolxpermiso.id_rol
+        INNER JOIN
+            permiso ON rolxpermiso.id_permiso = permiso.id_permiso
+        INNER JOIN
+            users u ON u.id_rol = rol.id
+        WHERE
+            rol.id = $1 AND u.id = $2
+        GROUP BY
+            rol.id, rol.nombre, rol.descripcion, rol.estado
+        ORDER BY
+            rol.id;
         `, [id_rol, id_usuario])
-        .then(data => data.rows)
+        .then(data => {
+            if (data.rowCount == 0) 
+                throw {
+                ok: false,
+                status_cod: 500,
+                data: 'No se pudo encontrar el usuario'
+            }
+        })
         .catch(error => {
             console.log(error);
             throw {
@@ -302,5 +303,6 @@ module.exports = {
     updateUsuario,
     fetchPermisos,
     usuarioXpermisos,
-    fetchroles
+    fetchroles,
+    validator
 }

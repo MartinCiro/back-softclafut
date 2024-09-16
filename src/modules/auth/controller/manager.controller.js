@@ -1,10 +1,8 @@
 const config = require('../../../config.js');
-const { insertClientRelationship } = require('../../clientes/utils/clientes.utils.js');
-const { insertNewUser, updateUsuario } = require('../utils/manager.utils.js');
+const { insertNewUser, updateUsuario, validator } = require('../utils/manager.utils.js');
 const Usuario = require('../model/usuario.js');
 
 const managerUtils = require("../utils/manager.utils.js");
-
 
 /**
  * Método para crear un nuevo usuario
@@ -23,12 +21,21 @@ const managerUtils = require("../utils/manager.utils.js");
  * @param {number[] || string[]} clientes 
  */
 async function createUser(nuevoUsuario) {
+    validator(nuevoUsuario.user, 'el usuario');
+    validator(nuevoUsuario.pass, 'la contrasena');
+    validator(nuevoUsuario.id_rol, 'el rol');
+    validator(nuevoUsuario.nombres, 'los nombres');
+    validator(nuevoUsuario.apellidos, 'los apellidos');
+
     const usuario = Usuario(
-        nuevoUsuario.usuario,
+        nuevoUsuario.user,
         nuevoUsuario.pass,
         nuevoUsuario.id_rol,
-        nuevoUsuario.habilitado
+        nuevoUsuario.status
     );
+
+    usuario.nombres = nuevoUsuario.nombres;
+    usuario.apellidos = nuevoUsuario.apellidos;
 
     const id_usuario = await insertNewUser({ ...usuario })
         .catch(error => {
@@ -50,7 +57,6 @@ async function createUser(nuevoUsuario) {
         }
     }
 }
-
 
 async function listarUsuarios() {
     let usuarios = await managerUtils.fetchUsuarios()
@@ -79,19 +85,9 @@ async function listarUsuarios() {
  *  }} options 
  */
 async function modificarUsuario(options) {
-    const { id, correo, id_sede, id_rol, numero_contacto, habilitado, id_cargo, nombre, apellidos } = options;
+    const { id, id_rol, estado, nombres, username, apellidos } = options;
 
-    if (!id) throw {
-        ok: false,
-        status_cod: 400,
-        data: 'No se ha proporcionado el id en las opciones'
-    }
-
-    if (!correo && !numero_contacto && !habilitado && !id_rol && !id_sede && !nombre && !id_cargo && !apellidos) throw {
-        ok: false,
-        status_cod: 400,
-        data: 'No se ha proporcionado campos para actualizar'
-    }
+    validator(id, 'el identificador del usuario');
 
     await updateUsuario(options)
         .then(() => { actualizado = true; })
@@ -141,16 +137,8 @@ async function listarRoles() {
 
 async function listarPermisoXUsuario(id_rol, id_usuario) {
 
-    if (!id_rol) throw {
-        ok: false,
-        status_cod: 400,
-        data: 'No se ha proporcionado el id_rol en las opciones'
-    }
-    if (!id_usuario) throw {
-        ok: false,
-        status_cod: 400,
-        data: 'No se ha proporcionado el id del usuario en las opciones'
-    }
+    validator(id_rol, 'el rol');
+    validator(id_usuario, 'el identificador de usuario');
 
     let permisosXusuario = await managerUtils.usuarioXpermisos(id_rol, id_usuario)
         .catch(error => {
